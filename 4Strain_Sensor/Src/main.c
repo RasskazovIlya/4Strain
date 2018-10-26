@@ -57,16 +57,14 @@ UART_HandleTypeDef huart1;
 #define    DWT_CONTROL   *(volatile unsigned long *)0xE0001000
 #define    SCB_DEMCR     *(volatile unsigned long *)0xE000EDFC
 uint32_t count_tic = 0;
-uint8_t button_flag = 0;
-uint8_t receive_arr[4];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_USART1_UART_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_USART1_UART_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -102,22 +100,23 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+	
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USART1_UART_Init();
   MX_SPI1_Init();
   MX_TIM3_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-	HAL_NVIC_DisableIRQ(EXTI4_IRQn);
-	HAL_NVIC_DisableIRQ(EXTI2_IRQn);
+
 	USART1->CR1 |= USART_CR1_RXNEIE;
+//	HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 	HAL_TIM_Base_Start(&htim3);
 	HAL_TIM_Base_Start_IT(&htim3);
 	
 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // CS = 0
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);
 	ADC_Config();
 
   /* USER CODE END 2 */
@@ -126,6 +125,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+//		uint8_t sync1 = 0x55;
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
@@ -222,7 +222,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 23;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 999;
+  htim3.Init.Period = 10000;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
   {
@@ -277,21 +277,15 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4|GPIO_PIN_11, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12|GPIO_PIN_13, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin : PC2 */
-  GPIO_InitStruct.Pin = GPIO_PIN_2;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PA4 */
   GPIO_InitStruct.Pin = GPIO_PIN_4;
@@ -302,7 +296,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : PC4 */
   GPIO_InitStruct.Pin = GPIO_PIN_4;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
@@ -315,16 +309,14 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : PA11 */
   GPIO_InitStruct.Pin = GPIO_PIN_11;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI2_IRQn, 2, 0);
-  //HAL_NVIC_EnableIRQ(EXTI2_IRQn);
-
   HAL_NVIC_SetPriority(EXTI4_IRQn, 3, 0);
-  //HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+//  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 
 }
 
@@ -334,7 +326,7 @@ void ADC_Config(void)
 	uint8_t wreg = 0x53, data = 0x00, byte1 = 0x00, sync = 0xFC, wakeup = 0x00, rreg = 0x10, rxData = 0x01, rst = 0xFE;
 	uint8_t rregADCon = 0x12, adcon_data = 0x00;
 	
-	EXTI->IMR |= EXTI_IMR_MR10; //Mask on EXTI4 (Line 10), DRDY interrupt is off
+//	EXTI->IMR |= EXTI_IMR_MR10; //Mask on EXTI4 (Line 10), DRDY interrupt is off
 
 	HAL_SPI_Transmit(&hspi1, &rst, 1, 10); //RESET
 
@@ -354,7 +346,7 @@ void ADC_Config(void)
 	HAL_SPI_Transmit(&hspi1, &byte1, 1, 10); //WREG DRATE second byte
 	HAL_SPI_Transmit(&hspi1, &data, 1, 10); //WREG DRATE third byte
 
-	EXTI->IMR &= ~(EXTI_IMR_MR10); //Mask on EXTI4 (Line 10), DRDY interrupt is on
+//	EXTI->IMR &= ~(EXTI_IMR_MR10); //Mask on EXTI4 (Line 10), DRDY interrupt is on
 }
 /* USER CODE END 4 */
 

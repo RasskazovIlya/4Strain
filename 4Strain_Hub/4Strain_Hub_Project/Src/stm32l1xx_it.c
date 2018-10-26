@@ -36,7 +36,15 @@
 #include "stm32l1xx_it.h"
 
 /* USER CODE BEGIN 0 */
+uint8_t data1[12], data2[12], data3[12], data4[12], sync1, sync2;
+extern uint8_t x;
 
+uint8_t transmit_failure_flag = 0, disable_failure_flag = 0;
+uint32_t  sync2_not_received = 0;
+
+void Receive_485(int num);
+void Transmit_485(int num);
+void Disable_485(int num);
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -212,39 +220,18 @@ void RCC_IRQHandler(void)
 void TIM10_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM10_IRQn 0 */
-	uint8_t com_send[2] = {0xBB, 0xBB};
+	
   /* USER CODE END TIM10_IRQn 0 */
   HAL_TIM_IRQHandler(&htim10);
   /* USER CODE BEGIN TIM10_IRQn 1 */
-//	HAL_GPIO_WritePin(GPIOB, RS_TE1_Pin|RS_RE1_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(GPIOB, RS_RE1_Pin, GPIO_PIN_RESET);//Enable reciever of 1st sensor
-	HAL_GPIO_WritePin(GPIOB, RS_TE1_Pin, GPIO_PIN_RESET);
-//	HAL_GPIO_WritePin(GPIOC, RS_TE2_Pin|RS_RE2_Pin, GPIO_PIN_RESET);//Enable reciever of 2nd sensor
-	HAL_GPIO_WritePin(GPIOC, RS_RE2_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(GPIOC, RS_TE2_Pin, GPIO_PIN_RESET);
-//	HAL_GPIO_WritePin(GPIOA, RS_TE4_Pin|RS_RE4_Pin|RS_TE3_Pin|RS_RE3_Pin, GPIO_PIN_RESET);//Enable reciever of 3rd and 4th sensor
-	HAL_GPIO_WritePin(GPIOA, RS_TE3_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(GPIOA, RS_RE3_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(GPIOA, RS_TE4_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(GPIOA, RS_RE4_Pin, GPIO_PIN_RESET);
 	
+	Disable_485(x);
+	Transmit_485(x);
+	x++;
 	
-	HAL_UART_Transmit(&huart2, com_send, 2, 10);
-	
-	//	HAL_GPIO_WritePin(GPIOB, RS_TE1_Pin|RS_RE1_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(GPIOB, RS_RE1_Pin, GPIO_PIN_SET);//Enable reciever of 1st sensor
-	HAL_GPIO_WritePin(GPIOB, RS_TE1_Pin, GPIO_PIN_SET);
-//	HAL_GPIO_WritePin(GPIOC, RS_TE2_Pin|RS_RE2_Pin, GPIO_PIN_RESET);//Enable reciever of 2nd sensor
-	HAL_GPIO_WritePin(GPIOC, RS_RE2_Pin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(GPIOC, RS_TE2_Pin, GPIO_PIN_SET);
-//	HAL_GPIO_WritePin(GPIOA, RS_TE4_Pin|RS_RE4_Pin|RS_TE3_Pin|RS_RE3_Pin, GPIO_PIN_RESET);//Enable reciever of 3rd and 4th sensor
-	HAL_GPIO_WritePin(GPIOA, RS_TE3_Pin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(GPIOA, RS_RE3_Pin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(GPIOA, RS_TE4_Pin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(GPIOA, RS_RE4_Pin, GPIO_PIN_SET);
-//	HAL_GPIO_WritePin(GPIOB, RS_TE1_Pin|RS_RE1_Pin, GPIO_PIN_SET);//Disable reciever of 1st sensor
-//	HAL_GPIO_WritePin(GPIOC, RS_TE2_Pin|RS_RE2_Pin, GPIO_PIN_SET);//Disable reciever of 2nd sensor
-//	HAL_GPIO_WritePin(GPIOA, RS_TE4_Pin|RS_RE4_Pin|RS_TE3_Pin|RS_RE3_Pin, GPIO_PIN_SET);//Disable reciever of 3rd and 4th sensor
+	if (x >= 5)
+		x = 1;
+
   /* USER CODE END TIM10_IRQn 1 */
 }
 
@@ -258,11 +245,173 @@ void USART2_IRQHandler(void)
   /* USER CODE END USART2_IRQn 0 */
   HAL_UART_IRQHandler(&huart2);
   /* USER CODE BEGIN USART2_IRQn 1 */
+	HAL_UART_Receive(&huart2, &sync1, 1, 10); //receive first sync byte
+	HAL_UART_Receive(&huart2, &sync2, 1, 10); //receive second sync byte
+	
+	switch(sync2)
+	{
+		case 0xBB:
+		{
+			HAL_UART_Receive(&huart2, data1, 12, 10); //receive data
+			break;
+		}
+		case 0xCC:
+		{
+			HAL_UART_Receive(&huart2, data2, 12, 10); //receive data
+			break;
+		}
+		case 0xDD:
+		{
+			HAL_UART_Receive(&huart2, data3, 12, 10); //receive data
+			break;
+		}
+		case 0xEE:
+		{
+			HAL_UART_Receive(&huart2, data4, 12, 10); //receive data
+			break;
+		}
+		default :
+		{
+			sync2_not_received++;
+			break;
+		}
+	}
+	
+	if (sync2_not_received > 100000)
+		sync2_not_received = 0;
+	sync2 = 0x00;
+	USART2->CR1 |= USART_CR1_RXNEIE;
 
   /* USER CODE END USART2_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */
+void Receive_485(int num)
+{
+	
+}
 
+void Transmit_485(int num)//Send command to 485 number "num"
+{
+	uint8_t com_send[2] = {0xBB, 0xBB};
+	switch(num)
+	{
+		case 1:
+		{
+			com_send[1] = 0xBB;
+			HAL_GPIO_WritePin(RS_RE1_GPIO_Port, RS_RE1_Pin, GPIO_PIN_SET);//Enable driver of 1st sensor
+			HAL_GPIO_WritePin(RS_TE1_GPIO_Port, RS_TE1_Pin, GPIO_PIN_SET);
+			HAL_UART_Transmit(&huart2, com_send, 2, 10);
+			HAL_GPIO_WritePin(RS_RE1_GPIO_Port, RS_RE1_Pin, GPIO_PIN_RESET);//Disable driver of 1st sensor
+			HAL_GPIO_WritePin(RS_TE1_GPIO_Port, RS_TE1_Pin, GPIO_PIN_RESET);
+			break;
+		}
+		case 2:
+		{
+			com_send[1] = 0xCC;
+			HAL_GPIO_WritePin(RS_RE2_GPIO_Port, RS_RE2_Pin, GPIO_PIN_SET);//Enable driver of 2st sensor
+			HAL_GPIO_WritePin(RS_TE2_GPIO_Port, RS_TE2_Pin, GPIO_PIN_SET);
+			HAL_UART_Transmit(&huart2, com_send, 2, 10);
+			HAL_GPIO_WritePin(RS_RE2_GPIO_Port, RS_RE2_Pin, GPIO_PIN_RESET);//Disable driver of 2st sensor
+			HAL_GPIO_WritePin(RS_TE2_GPIO_Port, RS_TE2_Pin, GPIO_PIN_RESET);
+			break;
+		}
+		case 3:
+		{
+			com_send[1] = 0xDD;
+			HAL_GPIO_WritePin(RS_RE3_GPIO_Port, RS_RE3_Pin, GPIO_PIN_SET);//Enable driver of 2st sensor
+			HAL_GPIO_WritePin(RS_TE3_GPIO_Port, RS_TE3_Pin, GPIO_PIN_SET);
+			HAL_UART_Transmit(&huart2, com_send, 2, 10);
+			HAL_GPIO_WritePin(RS_RE3_GPIO_Port, RS_RE3_Pin, GPIO_PIN_RESET);//Disable driver of 2st sensor
+			HAL_GPIO_WritePin(RS_TE3_GPIO_Port, RS_TE3_Pin, GPIO_PIN_RESET);
+			break;
+		}
+		case 4:
+		{
+			com_send[1] = 0xEE;
+			HAL_GPIO_WritePin(RS_RE4_GPIO_Port, RS_RE4_Pin, GPIO_PIN_SET);//Enable driver of 2st sensor
+			HAL_GPIO_WritePin(RS_TE4_GPIO_Port, RS_TE4_Pin, GPIO_PIN_SET);
+			HAL_UART_Transmit(&huart2, com_send, 2, 10);
+			HAL_GPIO_WritePin(RS_RE4_GPIO_Port, RS_RE4_Pin, GPIO_PIN_RESET);//Disable driver of 2st sensor
+			HAL_GPIO_WritePin(RS_TE4_GPIO_Port, RS_TE4_Pin, GPIO_PIN_RESET);
+			break;
+		}
+		default:
+		{
+			transmit_failure_flag = 1;
+			break;
+		}
+
+	}
+}
+
+void Disable_485(int num) //Disables all 485 transceivers except for number "num" 
+{
+	switch(num)
+	{
+		case 1:
+		{
+//			HAL_GPIO_WritePin(RS_RE1_GPIO_Port, RS_RE1_Pin, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(RS_RE2_GPIO_Port, RS_RE2_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(RS_RE2_GPIO_Port, RS_TE2_Pin, GPIO_PIN_RESET);
+			
+			HAL_GPIO_WritePin(RS_RE3_GPIO_Port, RS_RE3_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(RS_RE3_GPIO_Port, RS_TE3_Pin, GPIO_PIN_RESET);
+			
+			HAL_GPIO_WritePin(RS_RE4_GPIO_Port, RS_RE4_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(RS_RE4_GPIO_Port, RS_TE4_Pin, GPIO_PIN_RESET);
+			break;
+		}
+		case 2:
+		{
+			HAL_GPIO_WritePin(RS_RE1_GPIO_Port, RS_RE1_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(RS_RE2_GPIO_Port, RS_TE1_Pin, GPIO_PIN_RESET);
+//			HAL_GPIO_WritePin(RS_RE2_GPIO_Port, RS_RE2_Pin, GPIO_PIN_RESET);
+			
+			HAL_GPIO_WritePin(RS_RE3_GPIO_Port, RS_RE3_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(RS_RE3_GPIO_Port, RS_TE3_Pin, GPIO_PIN_RESET);
+			
+			HAL_GPIO_WritePin(RS_RE4_GPIO_Port, RS_RE4_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(RS_RE4_GPIO_Port, RS_TE4_Pin, GPIO_PIN_RESET);
+			break;
+		}
+		case 3:
+		{
+			HAL_GPIO_WritePin(RS_RE1_GPIO_Port, RS_RE1_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(RS_RE2_GPIO_Port, RS_TE1_Pin, GPIO_PIN_RESET);
+			
+			HAL_GPIO_WritePin(RS_RE2_GPIO_Port, RS_RE2_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(RS_RE3_GPIO_Port, RS_TE2_Pin, GPIO_PIN_RESET);
+			
+//			HAL_GPIO_WritePin(RS_RE3_GPIO_Port, RS_RE3_Pin, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(RS_RE4_GPIO_Port, RS_RE4_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(RS_RE4_GPIO_Port, RS_RE4_Pin, GPIO_PIN_RESET);
+			break;
+		}
+		case 4:
+		{
+			HAL_GPIO_WritePin(RS_RE1_GPIO_Port, RS_RE1_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(RS_RE2_GPIO_Port, RS_TE1_Pin, GPIO_PIN_RESET);
+			
+			HAL_GPIO_WritePin(RS_RE2_GPIO_Port, RS_RE2_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(RS_RE3_GPIO_Port, RS_TE2_Pin, GPIO_PIN_RESET);
+			
+			HAL_GPIO_WritePin(RS_RE3_GPIO_Port, RS_RE3_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(RS_RE4_GPIO_Port, RS_TE3_Pin, GPIO_PIN_RESET);
+//			HAL_GPIO_WritePin(RS_RE4_GPIO_Port, RS_RE4_Pin, GPIO_PIN_RESET);
+			
+			
+			
+			
+			break;
+		}
+		default: 
+		{
+			disable_failure_flag = 1;
+			break;
+		}
+	}
+}
+	
 /* USER CODE END 1 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

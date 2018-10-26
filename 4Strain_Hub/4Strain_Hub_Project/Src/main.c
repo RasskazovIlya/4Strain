@@ -51,14 +51,14 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-
+uint8_t x;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_USART2_UART_Init(void);
 static void MX_TIM10_Init(void);
+static void MX_USART2_UART_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -98,19 +98,17 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USART2_UART_Init();
   MX_TIM10_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-	uint8_t com_start[2] = {0xAA, 0xAA};
-	uint8_t com_send[2] = {0xBB, 0xBB};
-	//HAL_GPIO_WritePin(GPIOB, RS_TE1_Pin|RS_RE1_Pin, GPIO_PIN_RESET);//Set first sensor to recieve command
-//	HAL_UART_Transmit(&huart2, com_start, 2, 10);
-//	HAL_GPIO_WritePin(GPIOC, RS_TE2_Pin|RS_RE2_Pin, GPIO_PIN_SET);//Disable reciever of 2nd sensor
-//	HAL_GPIO_WritePin(GPIOA, RS_TE4_Pin|RS_RE4_Pin|RS_TE3_Pin|RS_RE3_Pin, GPIO_PIN_SET);//Disable reciever of 3rd and 4th sensor
-//	HAL_UART_Transmit(&huart2, com_send, 2, 10);
-//	HAL_GPIO_WritePin(GPIOB, RS_TE1_Pin|RS_RE1_Pin, GPIO_PIN_SET);//Disable reciever of 1st sensor
+
+	x = 1;
+	
+	USART2->CR1 |= USART_CR1_RXNEIE;
+	
 	HAL_TIM_Base_Start(&htim10);
 	HAL_TIM_Base_Start_IT(&htim10);
+	
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -187,9 +185,9 @@ static void MX_TIM10_Init(void)
   TIM_ClockConfigTypeDef sClockSourceConfig;
 
   htim10.Instance = TIM10;
-  htim10.Init.Prescaler = 31;
+  htim10.Init.Prescaler = 31;//31
   htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim10.Init.Period = 1000;
+  htim10.Init.Period = 2000;//500 Hz
   htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
   {
@@ -240,7 +238,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
-
+	
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, RS_TE4_Pin|RS_RE4_Pin|RS_TE3_Pin|RS_RE3_Pin, GPIO_PIN_RESET);
 
