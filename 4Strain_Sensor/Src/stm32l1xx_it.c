@@ -37,7 +37,7 @@
 
 /* USER CODE BEGIN 0 */
 
-uint8_t arr[12], data, data_sent = 0;
+uint8_t arr[15], data, data_sent = 0;
 int ch_counter = 0;
 uint32_t arr_24[4];
 
@@ -47,7 +47,6 @@ extern void ADC_Config(void);
 
 /* External variables --------------------------------------------------------*/
 extern SPI_HandleTypeDef hspi1;
-extern TIM_HandleTypeDef htim3;
 extern UART_HandleTypeDef huart1;
 
 /******************************************************************************/
@@ -223,61 +222,37 @@ void EXTI4_IRQHandler(void)
   /* USER CODE END EXTI4_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_4);
   /* USER CODE BEGIN EXTI4_IRQn 1 */
-	if (data_sent == 0)
-	{
-		switch (ch_counter)
-		{
-			case 0:
-			{
-				RREG(0);
-				break;
-			}
-			case 1:
-			{
-				RREG(1);
-				break;
-			}
-			case 2:
-			{
-				RREG(2);
-				break;
-			}
-			case 3:
-			{
-				RREG(3);
+//	if (data_sent == 0)
+//	{
+//		switch (ch_counter)
+//		{
+//			case 0:
+//			{
+//				RREG(0);
+//				break;
+//			}
+//			case 1:
+//			{
+//				RREG(1);
+//				break;
+//			}
+//			case 2:
+//			{
+//				RREG(2);
+//				break;
+//			}
+//			case 3:
+//			{
+//				RREG(3);
 
-				data_sent = 0;
-				ch_counter = -1;
-				break;
-			}
-		}
-		ch_counter++;
-	}
+//				data_sent = 0;
+//				ch_counter = -1;
+//				break;
+//			}
+//		}
+//		ch_counter++;
+//	}
   /* USER CODE END EXTI4_IRQn 1 */
-}
-
-/**
-* @brief This function handles TIM3 global interrupt.
-*/
-void TIM3_IRQHandler(void)
-{
-  /* USER CODE BEGIN TIM3_IRQn 0 */
-//	uint8_t sync1 = 0x55, sync2 = 0xAA, rip = 0x99;
-  /* USER CODE END TIM3_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim3);
-  /* USER CODE BEGIN TIM3_IRQn 1 */
-//	for (ch_counter = 0; ch_counter < 4; ch_counter++)
-//			RREG(ch_counter); //read register
-//		
-//	for (int i = 0; i < 12; i++)
-//		arr_final[i] = arr[i];
-//	
-//	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);
-//	HAL_UART_Transmit(&huart1, &sync1, 1, 10);//send sync byte1
-//	HAL_UART_Transmit(&huart1, &sync2, 1, 10);//send sync byte2
-//	HAL_UART_Transmit(&huart1, arr_final, 12, 10);//send data
-//		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);
-  /* USER CODE END TIM3_IRQn 1 */
 }
 
 /**
@@ -300,55 +275,12 @@ void SPI1_IRQHandler(void)
 void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
-	uint8_t sync1 = 0x55, sync2 = 0xAA, com[2] = {0x00, 0x00};
+	USART1->CR1 |= USART_CR1_RXNEIE;
+	
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */
-	HAL_UART_Receive(&huart1, com, 2, 10); //receive command
 	
-	if (com[0] == 0xBB) //else if send command
-	{
-		for (ch_counter = 0; ch_counter < 4; ch_counter++)
-			RREG(ch_counter); //read register
-		
-		switch (com[1])
-		{
-			case 0xBB:
-			{
-				sync2 = 0xBB;
-				break;
-			}
-			case 0xCC:
-			{
-				sync2 = 0xCC;
-				break;
-			}
-			case 0xDD:
-			{
-				sync2 = 0xDD;
-				break;
-			}
-			case 0xEE:
-			{
-				sync2 = 0xEE;
-				break;
-			}
-		}
-		
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);
-		HAL_UART_Transmit(&huart1, &sync1, 1, 10);//send sync byte1
-		HAL_UART_Transmit(&huart1, &sync2, 1, 10);//send sync byte2
-		HAL_UART_Transmit(&huart1, arr, 12, 10);//send data
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);
-	}
-	else 
-	{
-//		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);
-//		HAL_UART_Transmit(&huart1, &rip, 1, 10);//send data
-//		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);
-	}
-	
-	USART1->CR1 |= USART_CR1_RXNEIE;
   /* USER CODE END USART1_IRQn 1 */
 }
 
@@ -371,14 +303,63 @@ void RREG(int ch_counter)
 
 	while(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_4) == GPIO_PIN_SET){}; //delay until DRDY is high
 
-	HAL_SPI_Receive(&hspi1, &(arr[3*ch_counter]), 3, 10); //Data receive from channel ch_counter
+	HAL_SPI_Receive(&hspi1, &(arr[3*ch_counter+3]), 3, 10); //Data receive from channel ch_counter
 			
-	arr_24[ch_counter] =  ((uint32_t)(arr[3*ch_counter]) << 16) //3x8bit -> 24bit
-											+ ((uint32_t)(arr[3*ch_counter + 1]) << 8) 
-											 + (uint32_t)(arr[3*ch_counter + 2]);
+	arr_24[ch_counter] =  ((uint32_t)(arr[3*ch_counter+2]) << 16) //3x8bit -> 24bit
+											+ ((uint32_t)(arr[3*ch_counter + 3]) << 8) 
+											 + (uint32_t)(arr[3*ch_counter + 4]);
 		
 	if ((arr_24[ch_counter] & (0x800000)) != 0) //if arr_24 value if negative
 		arr_24[ch_counter] ^= 0x800000; //then subtract 0x800000
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	uint8_t sync1 = 0x55, sync2 = 0xAA, com[3] = {0x00, 0x00, 0x00};
+	
+	HAL_UART_Receive(&huart1, &com[0], 3, 10); //receive command
+	
+	if (com[1] == 0xAA) //if send command
+	{
+		switch (com[2])//switch for second byte of command to match number of sensor
+		{
+			case 0xBB:
+			{
+				sync2 = 0xBB;
+				break;
+			}
+			case 0xCC:
+			{
+				sync2 = 0xCC;
+				break;
+			}
+			case 0xDD:
+			{
+				sync2 = 0xDD;
+				break;
+			}
+			case 0xEE:
+			{
+				sync2 = 0xEE;
+				break;
+			}
+			default:
+			{
+				break;
+			}
+		}
+	}
+		
+		for (ch_counter = 0; ch_counter < 4; ch_counter++)
+			RREG(ch_counter); //read register
+		
+		arr[0] = sync1;
+		arr[1] = sync1;
+		arr[2] = sync2;
+		
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);
+		HAL_UART_Transmit(&huart1, arr, 15, 10);//send data
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);
 }
 
 /* USER CODE END 1 */

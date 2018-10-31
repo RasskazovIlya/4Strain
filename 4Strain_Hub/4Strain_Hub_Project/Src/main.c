@@ -47,11 +47,12 @@
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim10;
 
+UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-uint8_t x;
+uint8_t x, data0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -59,6 +60,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM10_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_USART1_UART_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -100,6 +102,7 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM10_Init();
   MX_USART2_UART_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
 	x = 1;
@@ -115,7 +118,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
+	HAL_UART_Receive_IT(&huart2, &data0, 1);
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
@@ -185,7 +188,7 @@ static void MX_TIM10_Init(void)
   TIM_ClockConfigTypeDef sClockSourceConfig;
 
   htim10.Instance = TIM10;
-  htim10.Init.Prescaler = 31;//31
+  htim10.Init.Prescaler = 31;
   htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim10.Init.Period = 2000;//500 Hz
   htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -196,6 +199,25 @@ static void MX_TIM10_Init(void)
 
   sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
   if (HAL_TIM_ConfigClockSource(&htim10, &sClockSourceConfig) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+}
+
+/* USART1 init function */
+static void MX_USART1_UART_Init(void)
+{
+
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 460800;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
@@ -238,9 +260,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
-	
+
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, RS_TE4_Pin|RS_RE4_Pin|RS_TE3_Pin|RS_RE3_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1|RS_TE4_Pin|RS_RE4_Pin|RS_TE3_Pin 
+                          |RS_RE3_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, RS_TE2_Pin|RS_RE2_Pin, GPIO_PIN_RESET);
@@ -248,8 +271,10 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, RS_TE1_Pin|RS_RE1_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : RS_TE4_Pin RS_RE4_Pin RS_TE3_Pin RS_RE3_Pin */
-  GPIO_InitStruct.Pin = RS_TE4_Pin|RS_RE4_Pin|RS_TE3_Pin|RS_RE3_Pin;
+  /*Configure GPIO pins : PA1 RS_TE4_Pin RS_RE4_Pin RS_TE3_Pin 
+                           RS_RE3_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_1|RS_TE4_Pin|RS_RE4_Pin|RS_TE3_Pin 
+                          |RS_RE3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
